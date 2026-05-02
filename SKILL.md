@@ -35,9 +35,9 @@ description: 用于研究话题、产品、社会事件、公众人物、政策�
 
 所有产出文件存放在 `research/<slug>/` 目录下。slug 在第一阶段从关键词派生。
 
-## 首次设置（LLM 引导）
+## 检查
 
-当用户首次触发此技能时，Claude 需要先检查环境是否就绪。按以下顺序检查并引导用户完成设置：
+当用户触发此技能时，Claude 需要先检查环境是否就绪。按以下顺序检查并引导用户完成设置：
 
 ### 检查步骤
 
@@ -94,9 +94,7 @@ uv run python scripts/setup_check.py
 
 ### 保存凭证
 
-用户提供凭证后，帮助用户保存到环境：
-
-**方式一：写入 .env 文件（推荐）**
+用户提供凭证后，帮助用户保存到环境，写入 .env 文件：
 
 创建 `.env` 文件：
 
@@ -112,14 +110,6 @@ EOF
 
 ```bash
 source .env
-```
-
-**方式二：直接导出**
-
-```bash
-export REDDIT_CLIENT_ID="用户提供的ID"
-export REDDIT_CLIENT_SECRET="用户提供的密钥"
-export REDDIT_USER_AGENT="python:reddit-research:v1.0"
 ```
 
 ### 验证设置
@@ -150,7 +140,7 @@ uv run python scripts/setup_check.py
 1. **slug**：从关键词派生的 kebab-case 标识符。
 2. **categorization**：多标签分类，权重之和为 1.0。标签词汇表：`product`（产品）、`service`（服务）、`policy`（政策）、`social_event`（社会事件）、`public_figure`（公众人物）、`cultural_trend`（文化趋势）、`controversy`（争议）、`health_topic`（健康话题）、`tech_phenomenon`（科技现象）、`lifestyle`（生活方式）、`media_work`（媒体作品）、`other`（其他）。允许多标签，如 `{product: 0.5, controversy: 0.3, lifestyle: 0.2}`。
 3. **research_intent**：一句话推测用户想要获得的决策或洞察。继续之前需与用户确认。
-4. **recommended_subreddits**：4 到 8 个子版块。以 REFERENCE.md 为起点。始终包含 1-2 个广泛子版块（如 r/AskReddit、r/changemyview）和 2-4 个垂直主题子版块。
+4. **recommended_subreddits**：4 到 8 个子版块。以 `docs/REFERENCE.md` 为起点。始终包含 1-2 个广泛子版块（如 r/AskReddit、r/changemyview）和 2-4 个垂直主题子版块。
 5. **keyword_groups**：6 到 10 个搜索查询词组。按分类权重比例混合下列角度。
 6. **analysis_emphasis**：统一 schema 中哪些字段需要重点关注。见第四阶段。
 7. **report_modules**：从 `templates/report_modules.md` 中选择 5-8 个模块 ID，用于第五阶段组装。
@@ -366,7 +356,7 @@ python scripts/filter_posts.py --input research/<slug>/raw_posts.jsonl --output 
 ## 本技能包含的文件
 
 * `SKILL.md`（本文件）：工作流程指南
-* `REFERENCE.md`：按主题分类的子版块速查表
+* `docs/REFERENCE.md`：按主题分类的子版块速查表
 * `scripts/setup_check.py`：环境和凭证检查脚本
 * `scripts/fetch_reddit.py`：Reddit 抓取器
 * `scripts/filter_posts.py`：规则过滤器
