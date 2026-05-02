@@ -4,13 +4,10 @@
 
 ## 安装（推荐）
 
-使用 Claude Code 插件系统安装：
+使用 Claude Code 或 antigravity 插件系统安装：
 
 ```bash
-# 1. 添加插件源
 /plugin marketplace add yangjunjie0320/reddit-research
-
-# 2. 安装插件
 /plugin install reddit-research
 ```
 

@@ -78,18 +78,29 @@ def serialize_post(submission, comments_per_post):
     }
 
 
-def fetch(profile, output_path):
-    reddit = praw.Reddit(
-        client_id=os.environ["REDDIT_CLIENT_ID"],
-        client_secret=os.environ["REDDIT_CLIENT_SECRET"],
-        user_agent=os.environ["REDDIT_USER_AGENT"],
-    )
+def fetch(profile, output_path, *, dry_run: bool = False):
     subreddits = profile["recommended_subreddits"]
     queries = profile["keyword_groups"]
     fetch_cfg = profile.get("fetch", {})
     posts_per_keyword = fetch_cfg.get("posts_per_keyword", 25)
     comments_per_post = fetch_cfg.get("comments_per_post", 15)
-    time_filter = fetch_cfg.get("time_filter", "year")  # all, year, month, week
+    time_filter = fetch_cfg.get("time_filter", "year")
+
+    total_searches = len(subreddits) * len(queries)
+    print(f"Plan: {len(subreddits)} subreddits × {len(queries)} queries = {total_searches} searches")
+    print(f"  posts_per_keyword={posts_per_keyword}, comments_per_post={comments_per_post}, time_filter={time_filter}")
+    for sub_name in subreddits:
+        print(f"  r/{sub_name}")
+
+    if dry_run:
+        print("\n[DRY RUN] No API calls made. Exiting.")
+        return
+
+    reddit = praw.Reddit(
+        client_id=os.environ["REDDIT_CLIENT_ID"],
+        client_secret=os.environ["REDDIT_CLIENT_SECRET"],
+        user_agent=os.environ["REDDIT_USER_AGENT"],
+    )
 
     seen = existing_post_ids(output_path)
     print(f"Already have {len(seen)} posts in {output_path}; will skip duplicates.")
@@ -101,17 +112,26 @@ def fetch(profile, output_path):
             sub = reddit.subreddit(sub_name)
             for query in queries:
                 print(f"  searching r/{sub_name} for: {query}")
-                try:
-                    results = list(
-                        sub.search(
-                            query,
-                            sort="relevance",
-                            time_filter=time_filter,
-                            limit=posts_per_keyword,
+                results = []
+                for attempt in range(3):
+                    try:
+                        results = list(
+                            sub.search(
+                                query,
+                                sort="relevance",
+                                time_filter=time_filter,
+                                limit=posts_per_keyword,
+                            )
                         )
-                    )
-                except Exception as e:
-                    print(f"    error: {type(e).__name__}: {e}, skipping")
+                        break
+                    except Exception as e:
+                        print(f"    error: {type(e).__name__}: {e} (attempt {attempt + 1}/3)")
+                        if attempt == 2:
+                            print("    skipping after 3 attempts")
+                        else:
+                            time.sleep(2 ** attempt)
+                
+                if not results:
                     continue
 
                 added_for_query = 0
@@ -128,8 +148,8 @@ def fetch(profile, output_path):
                         total_new += 1
                     except Exception as e:
                         print(f"    failed on post {submission.id}: {e}")
-                    time.sleep(0.5)  # be polite
                 print(f"    +{added_for_query} new")
+                time.sleep(1)  # conservative interval to avoid rate limiting
 
         print(f"\nDone. Added {total_new} new posts. Total in file: {len(seen)}.")
 
@@ -137,6 +157,7 @@ def fetch(profile, output_path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--profile", required=True, help="Path to profile.yaml")
+    parser.add_argument("--dry-run", action="store_true", help="Preview search plan without API calls")
     parser.add_argument(
         "--output",
         default=None,
@@ -154,7 +175,7 @@ def main():
             sys.exit(1)
         output_path = Path("research") / slug / "raw_posts.jsonl"
 
-    fetch(profile, output_path)
+    fetch(profile, output_path, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

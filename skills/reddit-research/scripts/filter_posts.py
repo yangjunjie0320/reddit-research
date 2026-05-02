@@ -4,10 +4,16 @@ filter_posts.py
 
 Apply rule based filters to raw_posts.jsonl. The defaults remove low
 engagement, very short, very old, or moderation flagged posts. All
-thresholds can be overridden via flags.
+thresholds can be overridden via --profile (reads filter_overrides from
+profile.yaml) or via explicit CLI flags (highest priority).
 
 Usage:
     python filter_posts.py --input research/<slug>/raw_posts.jsonl \\
+                           --output research/<slug>/candidates.jsonl
+
+    # Let profile.yaml drive overrides:
+    python filter_posts.py --profile research/<slug>/profile.yaml \\
+                           --input research/<slug>/raw_posts.jsonl \\
                            --output research/<slug>/candidates.jsonl
 """
 
@@ -16,6 +22,8 @@ import json
 import sys
 import time
 from pathlib import Path
+
+import yaml
 
 
 DEFAULTS = {
@@ -29,8 +37,35 @@ DEFAULTS = {
     "drop_over_18": False,
 }
 
+# Keys in filter_overrides that map directly to cfg keys.
+_OVERRIDE_KEY_MAP = {
+    "min_score": "min_score",
+    "min_comments": "min_comments",
+    "min_selftext_chars": "min_selftext_chars",
+    "min_top_comment_chars": "min_top_comment_chars",
+    "max_age_months": "max_age_months",
+    "drop_stickied": "drop_stickied",
+    "drop_locked": "drop_locked",
+    "drop_over_18": "drop_over_18",
+}
 
-def post_passes(post, cfg, now_utc):
+
+def load_profile_overrides(profile_path: str) -> dict:
+    """Read filter_overrides from a profile YAML. Returns empty dict on error."""
+    try:
+        with open(profile_path, "r", encoding="utf-8") as f:
+            profile = yaml.safe_load(f) or {}
+        overrides = profile.get("filter_overrides") or {}
+        if not isinstance(overrides, dict):
+            return {}
+        # Only keep recognised keys.
+        return {k: v for k, v in overrides.items() if k in _OVERRIDE_KEY_MAP}
+    except Exception as e:
+        print(f"Warning: could not read filter_overrides from {profile_path}: {e}")
+        return {}
+
+
+def post_passes(post: dict, cfg: dict, now_utc: float) -> tuple[bool, str]:
     if cfg["drop_stickied"] and post.get("stickied"):
         return False, "stickied"
     if cfg["drop_locked"] and post.get("locked"):
@@ -56,8 +91,9 @@ def post_passes(post, cfg, now_utc):
     if not selftext_ok and not comments_ok:
         return False, "thin content"
 
-    # Removed posts often have selftext == "[removed]" or "[deleted]".
-    if post.get("selftext", "").strip() in {"[removed]", "[deleted]"}:
+    # Removed posts often have selftext starting with "[removed" or "[deleted".
+    selftext_lower = post.get("selftext", "").strip().lower()
+    if selftext_lower.startswith("[removed") or selftext_lower.startswith("[deleted"):
         if not comments_ok:
             return False, "removed body, thin comments"
 
@@ -68,28 +104,44 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
-    parser.add_argument("--min-score", type=int, default=DEFAULTS["min_score"])
-    parser.add_argument("--min-comments", type=int, default=DEFAULTS["min_comments"])
-    parser.add_argument("--min-selftext-chars", type=int, default=DEFAULTS["min_selftext_chars"])
     parser.add_argument(
-        "--min-top-comment-chars", type=int, default=DEFAULTS["min_top_comment_chars"]
+        "--profile",
+        default=None,
+        help="Path to profile.yaml; filter_overrides section is read as defaults",
     )
-    parser.add_argument("--max-age-months", type=int, default=DEFAULTS["max_age_months"])
+    parser.add_argument("--min-score", type=int, default=None)
+    parser.add_argument("--min-comments", type=int, default=None)
+    parser.add_argument("--min-selftext-chars", type=int, default=None)
+    parser.add_argument("--min-top-comment-chars", type=int, default=None)
+    parser.add_argument("--max-age-months", type=int, default=None)
     parser.add_argument("--keep-stickied", action="store_true")
     parser.add_argument("--keep-locked", action="store_true")
     parser.add_argument("--drop-over-18", action="store_true")
     parser.add_argument("--verbose", action="store_true", help="Print drop reasons")
     args = parser.parse_args()
 
+    # Priority: CLI flag > profile filter_overrides > DEFAULTS.
+    profile_overrides = {}
+    if args.profile:
+        profile_overrides = load_profile_overrides(args.profile)
+        if profile_overrides:
+            print(f"Loaded filter_overrides from profile: {profile_overrides}")
+
+    def _resolve(key: str, cli_val):
+        """Return CLI value if explicitly set, else profile override, else default."""
+        if cli_val is not None:
+            return cli_val
+        return profile_overrides.get(key, DEFAULTS[key])
+
     cfg = {
-        "min_score": args.min_score,
-        "min_comments": args.min_comments,
-        "min_selftext_chars": args.min_selftext_chars,
-        "min_top_comment_chars": args.min_top_comment_chars,
-        "max_age_months": args.max_age_months,
-        "drop_stickied": not args.keep_stickied,
-        "drop_locked": not args.keep_locked,
-        "drop_over_18": args.drop_over_18,
+        "min_score": _resolve("min_score", args.min_score),
+        "min_comments": _resolve("min_comments", args.min_comments),
+        "min_selftext_chars": _resolve("min_selftext_chars", args.min_selftext_chars),
+        "min_top_comment_chars": _resolve("min_top_comment_chars", args.min_top_comment_chars),
+        "max_age_months": _resolve("max_age_months", args.max_age_months),
+        "drop_stickied": not args.keep_stickied if args.keep_stickied else _resolve("drop_stickied", None),
+        "drop_locked": not args.keep_locked if args.keep_locked else _resolve("drop_locked", None),
+        "drop_over_18": args.drop_over_18 if args.drop_over_18 else _resolve("drop_over_18", None),
     }
 
     inp = Path(args.input)

@@ -145,9 +145,25 @@ uv run python scripts/setup_check.py
 6. **analysis_emphasis**：统一 schema 中哪些字段需要重点关注。见第四阶段。
 7. **report_modules**：从 `templates/report_modules.md` 中选择 5-8 个模块 ID，用于第五阶段组装。
 
-### 关键词组角度（多语言）
+### 关键词语言识别
 
-根据用户关键词的语言，生成对应语言的搜索查询词。以下是各角度的多语言模板：
+本技能只区分两种情况：
+
+* **含中文字符** → 视为中文关键词，启用中英双轨
+* **其他所有情况** → 视为英文关键词，单轨
+
+非中文的小语种关键词（日、韩、西、德、法等）一律按英文处理：直接使用关键词原文搜索，不做翻译。Reddit 上这些语言的讨论密度有限，专门支持的工程成本不划算。
+
+### 中英双轨策略（仅中文关键词）
+
+Reddit 主流是英文社区，中文圈以海外华人为主（r/China_irl、r/saraba1st 等）。若用户输入中文关键词：
+
+1. 生成 5-7 条中文查询词组（命中中文区域社区）
+2. 同时生成 5-7 条英文翻译查询词组（命中主流英文社区）
+3. 子版块列表必须同时包含至少一个中文区域子版块和若干英文主流子版块
+4. 翻译时贴近 Reddit 用户实际用词，避免直译。如「四天工作制」译为 `four day workweek` 而非 `four-day work system`
+
+### 关键词组角度（中英双语模板）
 
 #### 英语 (English)
 
@@ -169,56 +185,15 @@ uv run python scripts/setup_check.py
 | 立场导向 | `<keyword> 争议`, `<keyword> 被高估`, `<keyword> 真的好吗`, `<keyword> 值不值` |
 | 发现导向 | `<keyword> 值得买吗`, `<keyword> 怎么选`, `<keyword> 入门` |
 
-#### 日语 (Japanese)
+中文关键词记得**两套都生成**：先按中文模板出 5-7 条，再把关键词翻译成英文（贴近 Reddit 用语），按英文模板再出 5-7 条。
 
-| 角度 | 查询模板 |
-|------|----------|
-| 问题导向 | `<keyword> 問題`, `<keyword> デメリット`, `<keyword> 欠点`, `<keyword> 後悔` |
-| 比较导向 | `<keyword> おすすめ`, `<keyword> 比較`, `<keyword> 代替`, `<keyword> vs` |
-| 体验导向 | `<keyword> レビュー`, `<keyword> 使ってみた`, `<keyword> 一年後`, `<keyword> 感想` |
-| 立场导向 | `<keyword> 評判`, `<keyword> 過大評価`, `<keyword> 本当に`, `<keyword> どう思う` |
-| 发现导向 | `<keyword> 買うべき`, `<keyword> 選び方`, `<keyword> 初心者` |
+### 中文子版块
 
-#### 韩语 (Korean)
-
-| 角度 | 查询模板 |
-|------|----------|
-| 问题导向 | `<keyword> 문제`, `<keyword> 단점`, `<keyword> 후회`, `<keyword> 별로` |
-| 比较导向 | `<keyword> 추천`, `<keyword> 비교`, `<keyword> 대안`, `<keyword> vs` |
-| 体验导向 | `<keyword> 후기`, `<keyword> 사용기`, `<keyword> 1년 후`, `<keyword> 솔직후기` |
-| 立场导向 | `<keyword> 논란`, `<keyword> 과대평가`, `<keyword> 진짜`, `<keyword> 어떻게 생각` |
-| 发现导向 | `<keyword> 살만한가`, `<keyword> 고르는법`, `<keyword> 입문` |
-
-#### 西班牙语 (Spanish)
-
-| 角度 | 查询模板 |
-|------|----------|
-| 问题导向 | `<keyword> problema`, `<keyword> defecto`, `<keyword> malo`, `<keyword> odio` |
-| 比较导向 | `mejor <keyword>`, `<keyword> vs`, `alternativa a <keyword>`, `<keyword> comparación` |
-| 体验导向 | `<keyword> reseña`, `<keyword> experiencia`, `<keyword> después de un año`, `probé <keyword>` |
-| 立场导向 | `<keyword> sobrevalorado`, `opinión impopular <keyword>`, `<keyword> vale la pena` |
-| 发现导向 | `<keyword> recomendación`, `debería comprar <keyword>`, `<keyword> para principiantes` |
-
-#### 德语 (German)
-
-| 角度 | 查询模板 |
-|------|----------|
-| 问题导向 | `<keyword> Problem`, `<keyword> Nachteile`, `<keyword> schlecht`, `<keyword> Fehler` |
-| 比较导向 | `beste <keyword>`, `<keyword> vs`, `<keyword> Alternative`, `<keyword> Vergleich` |
-| 体验导向 | `<keyword> Erfahrung`, `<keyword> Test`, `<keyword> nach einem Jahr`, `<keyword> Bewertung` |
-| 立场导向 | `<keyword> überbewertet`, `unpopuläre Meinung <keyword>`, `<keyword> lohnt sich` |
-| 发现导向 | `<keyword> Empfehlung`, `<keyword> kaufen`, `<keyword> für Anfänger` |
-
-### 语言检测与混合策略
-
-1. **检测用户关键词语言**：根据关键词的字符判断主要语言。
-2. **生成双语查询**：对于非英语关键词，同时生成该语言和英语的查询词组，因为 Reddit 以英语内容为主，但也有相应语言的子版块。
-3. **子版块适配**：根据语言推荐相应的区域子版块，如：
-   - 中文：r/China, r/ChineseLanguage, r/Sino, r/AsianParentStories
-   - 日语：r/japan, r/japanlife, r/LearnJapanese
-   - 韩语：r/korea, r/korean, r/hanguk
-   - 西语：r/spain, r/mexico, r/argentina, r/es
-   - 德语：r/de, r/germany, r/Austria
+中文关键词必须额外加至少 1 个中文区域子版块：
+- r/China_irl
+- r/saraba1st
+- r/real_China_irl
+- r/Chinatown_irl
 
 ### 确认步骤
 
@@ -255,8 +230,10 @@ python scripts/fetch_reddit.py --profile research/<slug>/profile.yaml
 ## 第三阶段：规则过滤
 
 ```bash
-python scripts/filter_posts.py --input research/<slug>/raw_posts.jsonl --output research/<slug>/candidates.jsonl
+python scripts/filter_posts.py --profile research/<slug>/profile.yaml --input research/<slug>/raw_posts.jsonl --output research/<slug>/candidates.jsonl
 ```
+
+The `--profile` flag reads `filter_overrides` from the profile YAML. Explicit CLI flags (e.g. `--min-score 10`) take highest priority over profile overrides, which in turn override built-in defaults.
 
 默认规则（如需可通过参数覆盖）：
 
@@ -272,6 +249,7 @@ python scripts/filter_posts.py --input research/<slug>/raw_posts.jsonl --output 
 ## 第四阶段：语义分析
 
 直接读取 `candidates.jsonl`。对每个候选帖子自行分析，无需外部 API 调用。
+**注意**：如果候选帖子数量较多（例如超过 15 个）且包含大量长评论，请**分批处理**（例如每批 10-15 个帖子）并多次追加写入 `analysis.jsonl`，以防止单次输出触发最大 Token 限制导致分析被截断。
 
 使用 `templates/analysis_schema.json` 中的统一 schema。每条记录具有相同字段。profile.analysis_emphasis 告诉你哪些字段需要重点关注。其他字段在不适用时可留空或设为 null。
 
@@ -352,10 +330,13 @@ python scripts/filter_posts.py --input research/<slug>/raw_posts.jsonl --output 
 * **离题噪音**：如果第四阶段很多记录得分低于 6，说明关键词组太宽泛。用引号包裹关键词或添加限定词来收紧查询。
 * **单一子版块主导**：如果超过 60% 的候选帖子来自同一个子版块，扩大推荐子版块列表并重新抓取代表性不足的子版块。
 * **抱团帖子**：如果争议报告显示极端的立场两极化且情绪分数很高，在 M11 中标记这一点，将其视为信号而非真相。
+* **中文关键词命中率低**：如果中文查询命中很少，说明该话题在 Reddit 中文圈讨论稀疏。把更多权重放到英文查询词组上，并在报告中说明：本报告主要反映英文圈讨论。
+* **中文圈样本偏差**：Reddit 中文社区以海外华人为主，他们的视角与国内用户存在系统性差异。如果研究目标是国内人群，Reddit 中文样本只能作为参考，结论应配合微博、小红书、知乎等平台数据交叉验证。在报告 M14 数据附录中明确标注此限制。
 
 ## 本技能包含的文件
 
 * `SKILL.md`（本文件）：工作流程指南
+* `SETUP.md`：环境配置一次性指南，仅在 setup_check.py 失败时阅读
 * `docs/REFERENCE.md`：按主题分类的子版块速查表
 * `scripts/setup_check.py`：环境和凭证检查脚本
 * `scripts/fetch_reddit.py`：Reddit 抓取器
@@ -364,4 +345,4 @@ python scripts/filter_posts.py --input research/<slug>/raw_posts.jsonl --output 
 * `templates/analysis_schema.json`：统一分析记录 schema
 * `templates/analysis_prompt.md`：分析提示词框架
 * `templates/report_modules.md`：模块库
-* `examples/`：三个示例画像，覆盖产品、争议、趋势
+* `examples/`：示例画像

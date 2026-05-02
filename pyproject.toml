@@ -2,7 +2,7 @@
 name = "reddit-research"
 version = "0.1.0"
 description = "Keyword-in, structured-memo-out workflow for mining Reddit discussions"
-readme = "CLAUDE.md"
+readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "praw>=7.7.0",
