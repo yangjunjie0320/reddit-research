@@ -48,15 +48,12 @@ claude
 ```
 reddit-research/
 ├── .claude-plugin/
-│   └── plugin.json       # 插件清单
-├── SKILL.md              # 工作流文档
-├── docs/SETUP.md              # 环境配置指南
+│   └── plugin.json
+├── SKILL.md
 ├── docs/
-│   └── REFERENCE.md      # 子版块速查
+│   ├── SETUP.md
+│   └── REFERENCE.md
 ├── scripts/
-│   ├── setup_check.py
-│   ├── fetch_reddit.py
-│   └── filter_posts.py
 ├── templates/
 ├── examples/
 ├── pyproject.toml
