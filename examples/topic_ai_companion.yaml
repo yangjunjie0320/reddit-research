@@ -1,0 +1,65 @@
+# Example profile: a cultural trend keyword.
+#
+# Demonstrates how a phenomenon keyword (less product, less debate)
+# maps to thematic clustering and quote walls rather than scoring.
+
+keyword: "AI companion apps"
+slug: "ai-companion-apps"
+
+categorization:
+  cultural_trend: 0.4
+  tech_phenomenon: 0.3
+  health_topic: 0.2
+  product: 0.1
+
+research_intent: |
+  Understand how everyday users describe their experience with AI
+  companion apps, what themes emerge across communities, and how
+  attitudes have evolved over the past 18 months.
+
+recommended_subreddits:
+  - AskReddit
+  - ChatGPT
+  - replika
+  - LonelyAfterLockdown
+  - Millennials
+  - GenZ
+  - MentalHealth
+
+keyword_groups:
+  - "AI companion experience"
+  - "Replika after one year"
+  - "Character AI changed my life"
+  - "AI girlfriend boyfriend honest"
+  - "tried AI companion mental health"
+  - "AI companion app review long term"
+  - "stopped using AI companion"
+  - "AI companion overrated"
+
+analysis_emphasis:
+  - key_claims
+  - representative_quote
+  - emotional_tone
+  - credibility_signals
+
+report_modules:
+  - M01_one_line
+  - M08_quote_wall
+  - M09_theme_clusters
+  - M10_time_evolution
+  - M11_emotion_temperature
+  - M12_credibility_notes
+  - M14_data_appendix
+
+fetch:
+  posts_per_keyword: 30
+  comments_per_post: 20
+  time_filter: all  # this trend has only existed for ~2 years; pull all
+
+filter_overrides:
+  max_age_months: 30
+
+notes: |
+  This category requires careful credibility tagging because many
+  posts are emotionally charged personal stories. Time evolution module
+  is included because the user wants to detect attitude shifts.

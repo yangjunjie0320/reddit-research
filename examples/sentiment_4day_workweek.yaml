@@ -1,0 +1,67 @@
+# Example profile: a controversy / policy keyword.
+#
+# Demonstrates a stance heavy research run where opinion landscape
+# matters more than entities or prices.
+
+keyword: "four day workweek"
+slug: "four-day-workweek"
+
+categorization:
+  policy: 0.4
+  controversy: 0.3
+  cultural_trend: 0.2
+  lifestyle: 0.1
+
+research_intent: |
+  Map the opinion landscape on the 4 day workweek among working adults
+  on Reddit, identify the strongest arguments on each side, and detect
+  whether sentiment is shifting over time.
+
+recommended_subreddits:
+  - changemyview
+  - antiwork
+  - WorkReform
+  - Economics
+  - cscareerquestions
+  - Entrepreneur
+  - AskReddit
+
+keyword_groups:
+  - "four day workweek change my mind"
+  - "4 day workweek experience"
+  - "32 hour workweek tried"
+  - "four day workweek small business"
+  - "is four day workweek possible"
+  - "four day workweek productivity"
+  - "four day workweek bad idea"
+  - "32 hour week pilot results"
+
+analysis_emphasis:
+  - stance
+  - key_claims
+  - emotional_tone
+  - representative_quote
+  - credibility_signals
+
+report_modules:
+  - M01_one_line
+  - M06_stance_distribution
+  - M07_argument_pairs
+  - M08_quote_wall
+  - M11_emotion_temperature
+  - M12_credibility_notes
+  - M14_data_appendix
+
+fetch:
+  posts_per_keyword: 30
+  comments_per_post: 20
+  time_filter: year
+
+filter_overrides:
+  min_score: 10  # raise to filter out low engagement opinion noise
+
+notes: |
+  Two ideologically opposed subs intentionally included (antiwork and
+  Entrepreneur) so that stance distribution is not biased by source.
+  In aggregation, slice stance by subreddit to expose where each side
+  congregates.

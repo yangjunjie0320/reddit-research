@@ -1,0 +1,61 @@
+# Example profile: a product keyword.
+#
+# Demonstrates how a product heavy keyword maps to subreddits,
+# query angles, analysis emphasis, and report modules.
+
+keyword: "1 gallon water bottle"
+slug: "gallon-water-bottle"
+
+categorization:
+  product: 0.7
+  lifestyle: 0.2
+  health_topic: 0.1
+
+research_intent: |
+  Evaluate whether the 1 gallon water bottle category is a worthwhile
+  Amazon entry, including identifying differentiation angles and the
+  realistic price ceiling.
+
+recommended_subreddits:
+  - HydroHomies
+  - BuyItForLife
+  - Frugal
+  - Fitness
+  - Wellthatsucks
+
+keyword_groups:
+  - "1 gallon water bottle problem leak"
+  - "gallon water jug gym not insulated"
+  - "best gallon water bottle"
+  - "water bottle handle broken"
+  - "1 gallon water bottle review"
+  - "gallon jug vs hydro flask"
+  - "is gallon water bottle worth it"
+  - "water bottle insulation review"
+
+analysis_emphasis:
+  - key_claims
+  - specific_evidence
+  - entities_mentioned
+  - representative_quote
+
+report_modules:
+  - M01_one_line
+  - M02_pain_point_chart
+  - M03_price_psychology
+  - M04_entity_landscape
+  - M05_opportunity_score
+  - M13_action_directions
+  - M14_data_appendix
+
+fetch:
+  posts_per_keyword: 25
+  comments_per_post: 15
+  time_filter: year
+
+filter_overrides: {}
+
+notes: |
+  Prior research scored this category 5/10. Use this run to verify
+  whether insulated stainless steel positioning still has headroom
+  given Iron Flask's market presence.

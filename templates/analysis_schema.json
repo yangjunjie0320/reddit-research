@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RedditAnalysisRecord",
+  "description": "Unified record produced by Stage 4 semantic analysis. One per kept Reddit post.",
+  "type": "object",
+  "required": [
+    "post_id",
+    "relevance_score",
+    "key_claims",
+    "representative_quote"
+  ],
+  "properties": {
+    "post_id": {
+      "type": "string",
+      "description": "Reddit post ID, matches raw_posts.jsonl id field."
+    },
+    "subreddit": {
+      "type": "string",
+      "description": "Source subreddit name (without r/ prefix)."
+    },
+    "relevance_score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10,
+      "description": "How directly the post discusses the keyword. Discard records below 6."
+    },
+    "key_claims": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Core opinions, complaints, observations, or arguments. Phrase as verb plus object. Cluster near duplicates only at aggregation time."
+    },
+    "specific_evidence": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Concrete data points: numbers, dates, durations, prices, quantities, anecdotes. Empty array if absent."
+    },
+    "entities_mentioned": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Brands, products, people, organizations, places, alternatives. Normalized to canonical names where possible."
+    },
+    "stance": {
+      "type": ["string", "null"],
+      "enum": ["for", "against", "neutral", "mixed", null],
+      "description": "Position toward the keyword. Null when no implicit stance applies (e.g. pure how-to questions)."
+    },
+    "emotional_tone": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10,
+      "description": "0 calm or analytical, 10 furious or euphoric."
+    },
+    "representative_quote": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "Verbatim quote, under 15 words, capturing the strongest signal in the post or its top comment."
+    },
+    "credibility_signals": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "claims_owner",
+          "claims_user",
+          "posted_photo",
+          "linked_source",
+          "professional_in_field",
+          "secondhand",
+          "speculation",
+          "anecdotal",
+          "controversial_thread"
+        ]
+      },
+      "description": "Signals about how to weight this record's claims."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Free form analyst note; e.g. 'thread appears brigaded', 'OP later updated'."
+    }
+  }
+}
