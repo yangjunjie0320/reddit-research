@@ -35,33 +35,111 @@ description: 用于研究话题、产品、社会事件、公众人物、政策�
 
 所有产出文件存放在 `research/<slug>/` 目录下。slug 在第一阶段从关键词派生。
 
-## 首次设置
+## 首次设置（LLM 引导）
 
-首次使用前，运行交互式设置向导：
+当用户首次触发此技能时，Claude 需要先检查环境是否就绪。按以下顺序检查并引导用户完成设置：
+
+### 检查步骤
+
+**1. 检查 uv 是否安装**
 
 ```bash
-uv run python scripts/interactive_setup.py
+which uv
 ```
 
-向导会引导你：
-1. 检查 Python 依赖是否安装
-2. 指导你在 Reddit 创建 API 应用
-3. 收集并保存 API 凭证到 `.env` 文件
-4. 验证 API 连接是否成功
+如果未安装，告诉用户：
+> uv 尚未安装。请运行以下命令安装：
+> ```bash
+> curl -LsSf https://astral.sh/uv/install.sh | sh
+> ```
+> 安装后请重新打开终端或运行 `source ~/.bashrc`
 
-设置完成后，每次使用前加载环境变量：
+**2. 检查 Python 虚拟环境**
+
+```bash
+uv sync
+```
+
+如果失败，检查 Python 版本或网络问题。成功后会创建 `.venv/` 目录。
+
+**3. 检查 Reddit API 凭证**
+
+```bash
+uv run python scripts/setup_check.py
+```
+
+根据输出判断缺失的内容：
+
+- 如果缺少环境变量，引导用户获取凭证
+- 如果凭证无效，引导用户检查并重新设置
+
+### 引导用户获取 Reddit API 凭证
+
+当检测到凭证缺失时，向用户说明：
+
+> 需要 Reddit API 凭证才能继续。请按以下步骤操作：
+>
+> 1. 打开浏览器访问 https://www.reddit.com/prefs/apps
+> 2. 滚动到底部，点击 "create another app..." 或 "are you a developer? create an app..."
+> 3. 填写表单：
+>    - **name**: 随意填写，如 `reddit-research`
+>    - **类型**: 选择 **script**（重要！）
+>    - **redirect uri**: 填写 `http://localhost:8080`
+> 4. 点击 "create app"
+> 5. 创建后记录以下信息：
+>    - **Client ID**: 在 "personal use script" 下方的字符串
+>    - **Client Secret**: 标记为 "secret" 的字符串
+>
+> 请告诉我你的 Client ID 和 Client Secret，我来帮你设置。
+
+### 保存凭证
+
+用户提供凭证后，帮助用户保存到环境：
+
+**方式一：写入 .env 文件（推荐）**
+
+创建 `.env` 文件：
+
+```bash
+cat > .env << 'EOF'
+export REDDIT_CLIENT_ID="用户提供的ID"
+export REDDIT_CLIENT_SECRET="用户提供的密钥"
+export REDDIT_USER_AGENT="python:reddit-research:v1.0 (by /u/anonymous)"
+EOF
+```
+
+然后加载：
 
 ```bash
 source .env
 ```
 
-或者手动导出：
+**方式二：直接导出**
 
 ```bash
-export REDDIT_CLIENT_ID="你的ID"
-export REDDIT_CLIENT_SECRET="你的密钥"
+export REDDIT_CLIENT_ID="用户提供的ID"
+export REDDIT_CLIENT_SECRET="用户提供的密钥"
 export REDDIT_USER_AGENT="python:reddit-research:v1.0"
 ```
+
+### 验证设置
+
+设置完成后，再次运行检查：
+
+```bash
+uv run python scripts/setup_check.py
+```
+
+看到 "All checks passed" 表示设置成功，可以开始研究。
+
+### 设置完成后
+
+告诉用户：
+> 设置完成！现在你可以告诉我想研究的关键词了。
+> 例如：
+> - "帮我研究 mechanical keyboard"
+> - "分析一下四天工作制的舆论"
+> - "调研 Stanley cup 的用户痛点"
 
 ## 第一阶段：画像生成
 
@@ -289,8 +367,7 @@ python scripts/filter_posts.py --input research/<slug>/raw_posts.jsonl --output 
 
 * `SKILL.md`（本文件）：工作流程指南
 * `REFERENCE.md`：按主题分类的子版块速查表
-* `scripts/interactive_setup.py`：交互式首次设置向导
-* `scripts/setup_check.py`：PRAW 凭证和依赖检查
+* `scripts/setup_check.py`：环境和凭证检查脚本
 * `scripts/fetch_reddit.py`：Reddit 抓取器
 * `scripts/filter_posts.py`：规则过滤器
 * `templates/profile_template.yaml`：画像 YAML 结构
