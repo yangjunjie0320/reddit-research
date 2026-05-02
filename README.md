@@ -50,7 +50,7 @@ reddit-research/
 ├── .claude-plugin/
 │   └── plugin.json       # 插件清单
 ├── SKILL.md              # 工作流文档
-├── SETUP.md              # 环境配置指南
+├── docs/SETUP.md              # 环境配置指南
 ├── docs/
 │   └── REFERENCE.md      # 子版块速查
 ├── scripts/
@@ -72,7 +72,7 @@ reddit-research/
 ## 文档
 
 - [SKILL.md](SKILL.md) - 完整工作流
-- [SETUP.md](SETUP.md) - 环境配置
+- [docs/SETUP.md](docs/SETUP.md) - 环境配置
 - [docs/REFERENCE.md](docs/REFERENCE.md) - 子版块速查
 
 ## License

@@ -336,7 +336,7 @@ The `--profile` flag reads `filter_overrides` from the profile YAML. Explicit CL
 ## 本技能包含的文件
 
 * `SKILL.md`（本文件）：工作流程指南
-* `SETUP.md`：环境配置一次性指南，仅在 setup_check.py 失败时阅读
+* `docs/SETUP.md`：环境配置一次性指南，仅在 setup_check.py 失败时阅读
 * `docs/REFERENCE.md`：按主题分类的子版块速查表
 * `scripts/setup_check.py`：环境和凭证检查脚本
 * `scripts/fetch_reddit.py`：Reddit 抓取器
