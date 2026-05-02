@@ -11,10 +11,18 @@
 
 ## 安装
 
-让你的 agent 安装这个技能：
+手动克隆到对应的 skills 目录：
 
-```
-请帮我安装 https://github.com/yangjunjie0320/reddit-research.git
+| 工具 | 全局安装路径 |
+|------|------|
+| Claude Code | `~/.claude/skills/reddit-research/` |
+| Antigravity | `~/.gemini/antigravity/skills/reddit-research/` |
+| Codex CLI | `~/.codex/skills/reddit-research/` |
+
+```bash
+# 以 Claude Code 为例，根据实际情况替换 SKILLS_DIR
+export SKILLS_DIR="~/.claude/skills/reddit-research/"
+git clone https://github.com/yangjunjie0320/reddit-research.git $SKILLS_DIR
 ```
 
 ## 快速开始
