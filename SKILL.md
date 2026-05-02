@@ -1,206 +1,300 @@
 ---
 name: reddit-research
-description: Use this skill when the user wants to research a topic, product, social event, public figure, policy, or cultural trend by mining real discussions on Reddit. Trigger on any keyword based research request, including 选品分析, 买家痛点研究, 舆论分析, sentiment research, opinion mining, niche evaluation, trend analysis, 痛点挖掘. The user provides a single keyword or short phrase. The skill auto profiles the keyword, recommends subreddits and queries, fetches and filters posts, performs semantic analysis with a unified schema, and assembles a modular memo report whose shape adapts to the keyword.
+description: 用于研究话题、产品、社会事件、公众人物、政策或文化趋势的技能。通过挖掘 Reddit 真实讨论获取洞察。触发词包括：选品分析、买家痛点研究、舆论分析、sentiment research、opinion mining、niche evaluation、trend analysis、痛点挖掘、市场调研、用户反馈分析。用户提供一个关键词或短语，技能自动生成画像、推荐子版块和查询词、抓取并过滤帖子、进行语义分析，最后组装一份模块化的调研报告。
 ---
 
-# Reddit Research
+# Reddit 调研
 
-A keyword in, structured memo out workflow. The user supplies one keyword. Claude profiles the keyword, runs a fixed data pipeline, and assembles a report whose modules adapt to whatever the keyword turned out to be.
+关键词输入，结构化报告输出。用户提供一个关键词，Claude 自动生成画像、运行固定的数据管道，并组装一份根据关键词特性自适应的报告。
 
-## Design Principle
+## 设计原则
 
-One pipeline, soft adaptation. The fetch and filter stages are identical for every keyword. The keyword profile, generated in Stage 1, is a soft signal that biases the analysis prompt and the report module selection. Hard category routing is avoided because most real keywords are multi label (a product is also a policy, a person is also a controversy).
+一条管道，柔性适配。抓取和过滤阶段对所有关键词完全相同。第一阶段生成的关键词画像是一个软信号，用于引导分析提示词和报告模块选择。避免硬分类路由，因为大多数真实关键词都是多标签的（一个产品同时也是一个政策议题，一个人物同时也是一个争议话题）。
 
-## Workflow at a Glance
+## 工作流程概览
 
 ```
-keyword
+关键词
    │
    ▼
-[1] Profile generation         ← LLM auto profiles the keyword
-   │   produces: profile.yaml
+[1] 画像生成         ← LLM 自动分析关键词
+   │   产出: profile.yaml
    ▼
-[2] Reddit fetch                ← script, identical for all keywords
-   │   produces: raw_posts.jsonl
+[2] Reddit 抓取      ← 脚本，所有关键词通用
+   │   产出: raw_posts.jsonl
    ▼
-[3] Rule based filter           ← script, identical for all keywords
-   │   produces: candidates.jsonl
+[3] 规则过滤         ← 脚本，所有关键词通用
+   │   产出: candidates.jsonl
    ▼
-[4] Semantic analysis           ← LLM, unified schema, profile aware emphasis
-   │   produces: analysis.jsonl + aggregates
+[4] 语义分析         ← LLM，统一 schema，画像感知的侧重点
+   │   产出: analysis.jsonl + aggregates
    ▼
-[5] Modular report assembly     ← LLM picks modules from library based on profile
-       produces: report.md
+[5] 模块化报告组装   ← LLM 根据画像从模块库中选择
+       产出: report.md
 ```
 
-All artifacts live under `research/<slug>/`. The slug is derived from the keyword in Stage 1.
+所有产出文件存放在 `research/<slug>/` 目录下。slug 在第一阶段从关键词派生。
 
-## Stage 1: Profile Generation
+## 首次设置
 
-Ask the user for the keyword if not yet provided. Then generate a profile YAML by reasoning over the keyword. Save to `research/<slug>/profile.yaml`. Use `templates/profile_template.yaml` as the structure.
+首次使用前，运行交互式设置向导：
 
-The profile contains seven blocks:
+```bash
+uv run python scripts/interactive_setup.py
+```
 
-1. **slug**: kebab case identifier derived from the keyword.
-2. **categorization**: multi label tags with weights summing to 1.0. Tag vocabulary: `product`, `service`, `policy`, `social_event`, `public_figure`, `cultural_trend`, `controversy`, `health_topic`, `tech_phenomenon`, `lifestyle`, `media_work`, `other`. Multiple tags allowed, e.g. `{product: 0.5, controversy: 0.3, lifestyle: 0.2}`.
-3. **research_intent**: one sentence inferred guess at what decision or insight the user is after. Confirm with the user before proceeding.
-4. **recommended_subreddits**: 4 to 8 subreddits. Use REFERENCE.md as a starting point. Always include 1 to 2 broad subreddits (e.g. r/AskReddit, r/changemyview) and 2 to 4 narrow topical ones.
-5. **keyword_groups**: 6 to 10 search queries. Mix the angles below in proportion to the categorization weights.
-6. **analysis_emphasis**: which fields in the unified schema deserve extra attention. See Stage 4.
-7. **report_modules**: 5 to 8 module IDs from `templates/report_modules.md` to assemble in Stage 5.
+向导会引导你：
+1. 检查 Python 依赖是否安装
+2. 指导你在 Reddit 创建 API 应用
+3. 收集并保存 API 凭证到 `.env` 文件
+4. 验证 API 连接是否成功
 
-### Keyword group angles
+设置完成后，每次使用前加载环境变量：
 
-* **Problem oriented**: `<keyword> problem`, `<keyword> broken`, `<keyword> issue`, `<keyword> hate`
-* **Comparison oriented**: `best <keyword>`, `<keyword> vs <alternative>`, `alternative to <keyword>`
-* **Experience oriented**: `<keyword> review`, `tried <keyword>`, `<keyword> after one year`
-* **Stance oriented**: `<keyword> change my mind`, `unpopular opinion <keyword>`, `<keyword> overrated`
-* **Discovery oriented**: `<keyword> recommendation`, `is <keyword> worth it`
+```bash
+source .env
+```
 
-For a product heavy keyword, weight problem and comparison angles. For a controversy heavy keyword, weight stance angles. For a cultural trend, weight experience and discovery angles.
+或者手动导出：
 
-### Confirmation step
+```bash
+export REDDIT_CLIENT_ID="你的ID"
+export REDDIT_CLIENT_SECRET="你的密钥"
+export REDDIT_USER_AGENT="python:reddit-research:v1.0"
+```
 
-Present the generated profile to the user. Show categorization weights, research intent, subreddit list, and keyword group list. Ask for one of:
+## 第一阶段：画像生成
 
-* Confirm and proceed
-* Adjust specific items (user names them)
-* Add or remove subreddits or queries
+如果用户尚未提供关键词，先询问。然后通过推理生成画像 YAML，保存到 `research/<slug>/profile.yaml`。使用 `templates/profile_template.yaml` 作为结构模板。
 
-Iterate until the user confirms.
+画像包含七个部分：
 
-## Stage 2: Reddit Fetch
+1. **slug**：从关键词派生的 kebab-case 标识符。
+2. **categorization**：多标签分类，权重之和为 1.0。标签词汇表：`product`（产品）、`service`（服务）、`policy`（政策）、`social_event`（社会事件）、`public_figure`（公众人物）、`cultural_trend`（文化趋势）、`controversy`（争议）、`health_topic`（健康话题）、`tech_phenomenon`（科技现象）、`lifestyle`（生活方式）、`media_work`（媒体作品）、`other`（其他）。允许多标签，如 `{product: 0.5, controversy: 0.3, lifestyle: 0.2}`。
+3. **research_intent**：一句话推测用户想要获得的决策或洞察。继续之前需与用户确认。
+4. **recommended_subreddits**：4 到 8 个子版块。以 REFERENCE.md 为起点。始终包含 1-2 个广泛子版块（如 r/AskReddit、r/changemyview）和 2-4 个垂直主题子版块。
+5. **keyword_groups**：6 到 10 个搜索查询词组。按分类权重比例混合下列角度。
+6. **analysis_emphasis**：统一 schema 中哪些字段需要重点关注。见第四阶段。
+7. **report_modules**：从 `templates/report_modules.md` 中选择 5-8 个模块 ID，用于第五阶段组装。
 
-Verify Reddit API credentials:
+### 关键词组角度（多语言）
+
+根据用户关键词的语言，生成对应语言的搜索查询词。以下是各角度的多语言模板：
+
+#### 英语 (English)
+
+| 角度 | 查询模板 |
+|------|----------|
+| 问题导向 | `<keyword> problem`, `<keyword> broken`, `<keyword> issue`, `<keyword> hate`, `<keyword> sucks` |
+| 比较导向 | `best <keyword>`, `<keyword> vs`, `alternative to <keyword>`, `<keyword> competitor` |
+| 体验导向 | `<keyword> review`, `tried <keyword>`, `<keyword> after one year`, `<keyword> experience` |
+| 立场导向 | `<keyword> change my mind`, `unpopular opinion <keyword>`, `<keyword> overrated`, `<keyword> underrated` |
+| 发现导向 | `<keyword> recommendation`, `is <keyword> worth it`, `should I buy <keyword>` |
+
+#### 中文 (Chinese)
+
+| 角度 | 查询模板 |
+|------|----------|
+| 问题导向 | `<keyword> 问题`, `<keyword> 缺点`, `<keyword> 坑`, `<keyword> 吐槽`, `<keyword> 踩雷` |
+| 比较导向 | `<keyword> 推荐`, `<keyword> 对比`, `<keyword> 替代品`, `<keyword> 哪个好` |
+| 体验导向 | `<keyword> 测评`, `<keyword> 使用感受`, `<keyword> 一年后`, `<keyword> 真实体验` |
+| 立场导向 | `<keyword> 争议`, `<keyword> 被高估`, `<keyword> 真的好吗`, `<keyword> 值不值` |
+| 发现导向 | `<keyword> 值得买吗`, `<keyword> 怎么选`, `<keyword> 入门` |
+
+#### 日语 (Japanese)
+
+| 角度 | 查询模板 |
+|------|----------|
+| 问题导向 | `<keyword> 問題`, `<keyword> デメリット`, `<keyword> 欠点`, `<keyword> 後悔` |
+| 比较导向 | `<keyword> おすすめ`, `<keyword> 比較`, `<keyword> 代替`, `<keyword> vs` |
+| 体验导向 | `<keyword> レビュー`, `<keyword> 使ってみた`, `<keyword> 一年後`, `<keyword> 感想` |
+| 立场导向 | `<keyword> 評判`, `<keyword> 過大評価`, `<keyword> 本当に`, `<keyword> どう思う` |
+| 发现导向 | `<keyword> 買うべき`, `<keyword> 選び方`, `<keyword> 初心者` |
+
+#### 韩语 (Korean)
+
+| 角度 | 查询模板 |
+|------|----------|
+| 问题导向 | `<keyword> 문제`, `<keyword> 단점`, `<keyword> 후회`, `<keyword> 별로` |
+| 比较导向 | `<keyword> 추천`, `<keyword> 비교`, `<keyword> 대안`, `<keyword> vs` |
+| 体验导向 | `<keyword> 후기`, `<keyword> 사용기`, `<keyword> 1년 후`, `<keyword> 솔직후기` |
+| 立场导向 | `<keyword> 논란`, `<keyword> 과대평가`, `<keyword> 진짜`, `<keyword> 어떻게 생각` |
+| 发现导向 | `<keyword> 살만한가`, `<keyword> 고르는법`, `<keyword> 입문` |
+
+#### 西班牙语 (Spanish)
+
+| 角度 | 查询模板 |
+|------|----------|
+| 问题导向 | `<keyword> problema`, `<keyword> defecto`, `<keyword> malo`, `<keyword> odio` |
+| 比较导向 | `mejor <keyword>`, `<keyword> vs`, `alternativa a <keyword>`, `<keyword> comparación` |
+| 体验导向 | `<keyword> reseña`, `<keyword> experiencia`, `<keyword> después de un año`, `probé <keyword>` |
+| 立场导向 | `<keyword> sobrevalorado`, `opinión impopular <keyword>`, `<keyword> vale la pena` |
+| 发现导向 | `<keyword> recomendación`, `debería comprar <keyword>`, `<keyword> para principiantes` |
+
+#### 德语 (German)
+
+| 角度 | 查询模板 |
+|------|----------|
+| 问题导向 | `<keyword> Problem`, `<keyword> Nachteile`, `<keyword> schlecht`, `<keyword> Fehler` |
+| 比较导向 | `beste <keyword>`, `<keyword> vs`, `<keyword> Alternative`, `<keyword> Vergleich` |
+| 体验导向 | `<keyword> Erfahrung`, `<keyword> Test`, `<keyword> nach einem Jahr`, `<keyword> Bewertung` |
+| 立场导向 | `<keyword> überbewertet`, `unpopuläre Meinung <keyword>`, `<keyword> lohnt sich` |
+| 发现导向 | `<keyword> Empfehlung`, `<keyword> kaufen`, `<keyword> für Anfänger` |
+
+### 语言检测与混合策略
+
+1. **检测用户关键词语言**：根据关键词的字符判断主要语言。
+2. **生成双语查询**：对于非英语关键词，同时生成该语言和英语的查询词组，因为 Reddit 以英语内容为主，但也有相应语言的子版块。
+3. **子版块适配**：根据语言推荐相应的区域子版块，如：
+   - 中文：r/China, r/ChineseLanguage, r/Sino, r/AsianParentStories
+   - 日语：r/japan, r/japanlife, r/LearnJapanese
+   - 韩语：r/korea, r/korean, r/hanguk
+   - 西语：r/spain, r/mexico, r/argentina, r/es
+   - 德语：r/de, r/germany, r/Austria
+
+### 确认步骤
+
+向用户展示生成的画像。显示分类权重、研究意图、子版块列表和关键词组列表。询问用户：
+
+* 确认并继续
+* 调整特定项目（用户指出）
+* 添加或删除子版块或查询词
+
+循环直到用户确认。
+
+## 第二阶段：Reddit 抓取
+
+验证 Reddit API 凭证：
 
 ```bash
 python scripts/setup_check.py
 ```
 
-If credentials are missing, instruct the user to create a script type app at https://www.reddit.com/prefs/apps and export `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT`.
+如果凭证缺失，指导用户在 https://www.reddit.com/prefs/apps 创建一个 script 类型的应用，然后导出 `REDDIT_CLIENT_ID`、`REDDIT_CLIENT_SECRET`、`REDDIT_USER_AGENT`。
 
-Then fetch:
+然后抓取：
 
 ```bash
 python scripts/fetch_reddit.py --profile research/<slug>/profile.yaml
 ```
 
-Output: `research/<slug>/raw_posts.jsonl`. Each line is one post, with metadata and top comments inline.
+输出：`research/<slug>/raw_posts.jsonl`。每行是一个帖子，包含元数据和前几条评论。
 
-The fetcher is profile agnostic. It reads only the subreddit list, keyword groups, posts_per_keyword, comments_per_post, and time_filter from the profile. Resume safe; rerunning skips post IDs already saved.
+抓取器与画像无关。它只读取画像中的子版块列表、关键词组、posts_per_keyword、comments_per_post 和 time_filter。支持断点续传；重新运行会跳过已保存的帖子 ID。
 
-Typical yield: 80 to 200 posts.
+典型产出：80 到 200 个帖子。
 
-## Stage 3: Rule Based Filter
+## 第三阶段：规则过滤
 
 ```bash
 python scripts/filter_posts.py --input research/<slug>/raw_posts.jsonl --output research/<slug>/candidates.jsonl
 ```
 
-Default rules (override via flags if needed):
+默认规则（如需可通过参数覆盖）：
 
 * `score >= 5`
 * `num_comments >= 3`
-* selftext length >= 100 chars OR top comment length >= 200 chars
-* posted within the last 24 months
-* not stickied, locked, or removed
-* not a pure link post unless it has substantive comments
+* 正文长度 >= 100 字符 或 首条评论长度 >= 200 字符
+* 发布于最近 24 个月内
+* 非置顶、未锁定、未删除
+* 非纯链接帖，除非有实质性评论
 
-Typical yield: 20 to 40 candidates.
+典型产出：20 到 40 个候选帖子。
 
-## Stage 4: Semantic Analysis
+## 第四阶段：语义分析
 
-Read `candidates.jsonl` directly. For each candidate, do the analysis yourself, no external API call.
+直接读取 `candidates.jsonl`。对每个候选帖子自行分析，无需外部 API 调用。
 
-Use the unified schema in `templates/analysis_schema.json`. Every record has the same fields. The profile.analysis_emphasis tells you where to spend effort. Other fields can be left as null or empty arrays when not applicable.
+使用 `templates/analysis_schema.json` 中的统一 schema。每条记录具有相同字段。profile.analysis_emphasis 告诉你哪些字段需要重点关注。其他字段在不适用时可留空或设为 null。
 
-Unified schema fields:
+统一 schema 字段：
 
-| Field | Type | Notes |
+| 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| post_id | string | Reddit post ID |
-| relevance_score | int 0 to 10 | Discard if below 6 |
-| key_claims | list of strings | Core opinions, complaints, observations, or arguments. Phrase as verb plus object. |
-| specific_evidence | list of strings | Numbers, dates, anecdotes, prices, durations, anything concrete |
-| entities_mentioned | list of strings | Brands, products, people, organizations, places, alternatives |
-| stance | enum or null | One of `for`, `against`, `neutral`, `mixed`, `null`. Use null when there is no implicit position to take. |
-| emotional_tone | int 0 to 10 | 0 calm or analytical, 10 furious or euphoric |
-| representative_quote | string | Verbatim, under 15 words. One per post. |
-| credibility_signals | list of strings | E.g. `claims_owner`, `posted_photo`, `secondhand`, `speculation`, `professional_in_field` |
+| post_id | string | Reddit 帖子 ID |
+| relevance_score | int 0-10 | 低于 6 则丢弃 |
+| key_claims | 字符串列表 | 核心观点、抱怨、观察或论点。用动词+宾语形式表达。 |
+| specific_evidence | 字符串列表 | 数字、日期、轶事、价格、时长等具体信息 |
+| entities_mentioned | 字符串列表 | 品牌、产品、人物、组织、地点、替代品 |
+| stance | 枚举或 null | `for`（支持）、`against`（反对）、`neutral`（中立）、`mixed`（混合）、`null`。无隐含立场时用 null。 |
+| emotional_tone | int 0-10 | 0 为冷静/分析性，10 为愤怒/狂喜 |
+| representative_quote | string | 原文引用，15 词以内。每帖一条。 |
+| credibility_signals | 字符串列表 | 如 `claims_owner`（声称是用户）、`posted_photo`（发了照片）、`secondhand`（二手信息）、`speculation`（推测）、`professional_in_field`（专业人士） |
 
-Read the prompt framing in `templates/analysis_prompt.md` and inject the profile.analysis_emphasis from the user's profile when reasoning.
+阅读 `templates/analysis_prompt.md` 中的提示词框架，在推理时注入用户画像的 profile.analysis_emphasis。
 
-Save kept records (relevance >= 6) to `research/<slug>/analysis.jsonl`.
+将保留的记录（relevance >= 6）保存到 `research/<slug>/analysis.jsonl`。
 
-Then aggregate. Build whichever of these aggregates the chosen report modules need; skip the rest:
+然后聚合。根据选定的报告模块需要构建以下聚合数据，跳过不需要的：
 
-* **claim_frequency**: cluster near duplicate `key_claims` and count. Top 15.
-* **entity_frequency**: count `entities_mentioned`, sorted desc. Top 15.
-* **stance_distribution**: percent for / against / neutral / mixed (only if stance is populated for >= 50% of records).
-* **evidence_pool**: flatten `specific_evidence`. Group by type (price, time, count, anecdote) when patterns emerge.
-* **emotion_histogram**: distribution of `emotional_tone` scores.
-* **quote_pool**: all `representative_quote` strings, paired with stance and emotional_tone for later filtering.
-* **credibility_breakdown**: how many posts are firsthand vs secondhand vs speculative.
+* **claim_frequency**：聚类近似的 `key_claims` 并计数。取前 15。
+* **entity_frequency**：统计 `entities_mentioned`，降序排列。取前 15。
+* **stance_distribution**：支持/反对/中立/混合的百分比（仅当 >= 50% 的记录有 stance 值时）。
+* **evidence_pool**：展平 `specific_evidence`。按类型（价格、时间、数量、轶事）分组（如有规律）。
+* **emotion_histogram**：`emotional_tone` 分数分布。
+* **quote_pool**：所有 `representative_quote`，配对 stance 和 emotional_tone 以便后续筛选。
+* **credibility_breakdown**：一手/二手/推测帖子各占多少。
 
-Save aggregates to `research/<slug>/aggregates.json`.
+将聚合数据保存到 `research/<slug>/aggregates.json`。
 
-## Stage 5: Modular Report Assembly
+## 第五阶段：模块化报告组装
 
-Read `templates/report_modules.md`. It defines a library of report modules, each with an ID, a purpose, an input requirement (which aggregates it needs), and a format example.
+阅读 `templates/report_modules.md`。它定义了一个报告模块库，每个模块有 ID、用途、输入需求（需要哪些聚合数据）和格式示例。
 
-Use the `report_modules` list in profile.yaml as the assembly order. If the profile picked modules whose required aggregates are missing or thin, either compute the missing aggregate now or substitute a related module.
+使用 profile.yaml 中的 `report_modules` 列表作为组装顺序。如果画像选择的模块所需的聚合数据缺失或稀疏，要么现在计算缺失的聚合，要么替换为相关模块。
 
-Standard module IDs:
+标准模块 ID：
 
-| ID | Purpose | Best for |
+| ID | 用途 | 最适合 |
 | --- | --- | --- |
-| M01_one_line | One sentence conclusion | All reports |
-| M02_pain_point_chart | Top complaints with frequency and quote | product, service |
-| M03_price_psychology | Price ceiling, floor, anchor brands | product, service |
-| M04_entity_landscape | Brands or alternatives mentioned, share of voice | product, service, controversy |
-| M05_opportunity_score | 1 to 10 with 4 dimension breakdown | product |
-| M06_stance_distribution | For / against / neutral pie | controversy, social_event, policy |
-| M07_argument_pairs | Strongest argument for each side | controversy, policy |
-| M08_quote_wall | 6 to 10 representative quotes, grouped | cultural_trend, social_event, public_figure |
-| M09_theme_clusters | Top 4 to 6 thematic clusters of claims | cultural_trend, tech_phenomenon |
-| M10_time_evolution | How discussion shifted across the time window | any with >= 12 months data |
-| M11_emotion_temperature | Emotion distribution chart and interpretation | controversy, social_event |
-| M12_credibility_notes | Firsthand vs secondhand mix, what to trust | health_topic, controversy |
-| M13_action_directions | Concrete next steps, prioritized by ROI | product, service |
-| M14_data_appendix | Subreddits, queries, post counts | All reports |
+| M01_one_line | 一句话结论 | 所有报告 |
+| M02_pain_point_chart | 热门抱怨及频率和引用 | 产品、服务 |
+| M03_price_psychology | 价格天花板、地板、锚定品牌 | 产品、服务 |
+| M04_entity_landscape | 提及的品牌或替代品，声量份额 | 产品、服务、争议 |
+| M05_opportunity_score | 1-10 分，含 4 个维度拆解 | 产品 |
+| M06_stance_distribution | 支持/反对/中立饼图 | 争议、社会事件、政策 |
+| M07_argument_pairs | 各方最强论点 | 争议、政策 |
+| M08_quote_wall | 6-10 条代表性引用，分组展示 | 文化趋势、社会事件、公众人物 |
+| M09_theme_clusters | 前 4-6 个主题性论点聚类 | 文化趋势、科技现象 |
+| M10_time_evolution | 讨论在时间窗口内的演变 | 任何 >= 12 个月数据的情况 |
+| M11_emotion_temperature | 情绪分布图及解读 | 争议、社会事件 |
+| M12_credibility_notes | 一手 vs 二手来源比例，可信度说明 | 健康话题、争议 |
+| M13_action_directions | 按 ROI 优先级排列的具体下一步行动 | 产品、服务 |
+| M14_data_appendix | 子版块、查询词、帖子数量 | 所有报告 |
 
-Always include M01 first and M14 last. Pick 3 to 6 from the middle based on the profile.
+始终将 M01 放在最前，M14 放在最后。根据画像从中间选择 3-6 个模块。
 
-Write the assembled report to `research/<slug>/report.md`. Then present it to the user inline. Offer follow ups:
+将组装好的报告写入 `research/<slug>/report.md`。然后向用户内联展示。提供后续选项：
 
-* Drill into any specific claim or entity
-* Reassemble report under a different module set, no refetch
-* Compare to a sibling keyword
-* Export quotes for a slide deck or annotation
+* 深入某个特定论点或实体
+* 用不同的模块集重新组装报告（无需重新抓取）
+* 与相关关键词对比
+* 导出引用用于幻灯片或标注
 
-## Output Conventions
+## 输出规范
 
-* Reports default to the user's language (Chinese if the keyword is Chinese, English otherwise).
-* Quotes from Reddit are kept under 15 words to respect copyright.
-* All Reddit usernames are stripped from the report. Refer to commenters as `a poster` or `several users`.
-* Numbers are rounded sensibly; do not invent precision the data does not support.
+* 报告默认使用用户的语言（如果关键词是中文则用中文，否则用英文）。
+* Reddit 引用保持在 15 词以内，以尊重版权。
+* 报告中剥离所有 Reddit 用户名。用"一位用户"或"多位用户"指代评论者。
+* 数字合理四舍五入；不要凭空增加数据不支持的精度。
 
-## Common Failure Modes
+## 常见失败模式
 
-* **Sparse data**: if Stage 3 produces fewer than 10 candidates, expand the time window first, then add more subreddits, then loosen score and length thresholds. State the limitation in the report's data appendix.
-* **Off topic noise**: if many Stage 4 records score below 6, the keyword groups were too broad. Tighten queries with the keyword in quotes or with an extra qualifier.
-* **Single subreddit dominance**: if more than 60% of candidates come from one sub, broaden the recommended subreddit list and refetch the underrepresented ones.
-* **Brigaded threads**: if a controversy report shows extreme stance polarization with very high emotional_tone, flag this in M11 and consider it a signal rather than ground truth.
+* **数据稀疏**：如果第三阶段产出少于 10 个候选帖子，先扩大时间窗口，再增加子版块，最后放宽分数和长度阈值。在报告的数据附录中说明这一限制。
+* **离题噪音**：如果第四阶段很多记录得分低于 6，说明关键词组太宽泛。用引号包裹关键词或添加限定词来收紧查询。
+* **单一子版块主导**：如果超过 60% 的候选帖子来自同一个子版块，扩大推荐子版块列表并重新抓取代表性不足的子版块。
+* **抱团帖子**：如果争议报告显示极端的立场两极化且情绪分数很高，在 M11 中标记这一点，将其视为信号而非真相。
 
-## Files in This Skill
+## 本技能包含的文件
 
-* `SKILL.md` (this file): workflow guide
-* `REFERENCE.md`: subreddit speed lookup by topic family
-* `scripts/setup_check.py`: PRAW credentials and dependency check
-* `scripts/fetch_reddit.py`: Reddit fetcher
-* `scripts/filter_posts.py`: rule based filter
-* `templates/profile_template.yaml`: profile YAML structure
-* `templates/analysis_schema.json`: unified analysis record schema
-* `templates/analysis_prompt.md`: analysis prompt framing
-* `templates/report_modules.md`: module library
-* `examples/`: three worked profile examples covering product, controversy, trend
+* `SKILL.md`（本文件）：工作流程指南
+* `REFERENCE.md`：按主题分类的子版块速查表
+* `scripts/interactive_setup.py`：交互式首次设置向导
+* `scripts/setup_check.py`：PRAW 凭证和依赖检查
+* `scripts/fetch_reddit.py`：Reddit 抓取器
+* `scripts/filter_posts.py`：规则过滤器
+* `templates/profile_template.yaml`：画像 YAML 结构
+* `templates/analysis_schema.json`：统一分析记录 schema
+* `templates/analysis_prompt.md`：分析提示词框架
+* `templates/report_modules.md`：模块库
+* `examples/`：三个示例画像，覆盖产品、争议、趋势
