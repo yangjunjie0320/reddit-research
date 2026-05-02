@@ -24,12 +24,12 @@ import praw
 import yaml
 
 
-def load_profile(path):
+def load_profile(path) -> dict:
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
-def existing_post_ids(output_path):
+def existing_post_ids(output_path) -> set[str]:
     if not output_path.exists():
         return set()
     ids = set()
@@ -44,7 +44,7 @@ def existing_post_ids(output_path):
     return ids
 
 
-def serialize_post(submission, comments_per_post):
+def serialize_post(submission, comments_per_post) -> dict:
     submission.comment_sort = "top"
     submission.comments.replace_more(limit=0)
     top_comments = []
@@ -154,7 +154,7 @@ def fetch(profile, output_path, *, dry_run: bool = False):
         print(f"\nDone. Added {total_new} new posts. Total in file: {len(seen)}.")
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--profile", required=True, help="Path to profile.yaml")
     parser.add_argument("--dry-run", action="store_true", help="Preview search plan without API calls")

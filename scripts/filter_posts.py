@@ -139,9 +139,9 @@ def main():
         "min_selftext_chars": _resolve("min_selftext_chars", args.min_selftext_chars),
         "min_top_comment_chars": _resolve("min_top_comment_chars", args.min_top_comment_chars),
         "max_age_months": _resolve("max_age_months", args.max_age_months),
-        "drop_stickied": not args.keep_stickied if args.keep_stickied else _resolve("drop_stickied", None),
-        "drop_locked": not args.keep_locked if args.keep_locked else _resolve("drop_locked", None),
-        "drop_over_18": args.drop_over_18 if args.drop_over_18 else _resolve("drop_over_18", None),
+        "drop_stickied": False if args.keep_stickied else _resolve("drop_stickied", None),
+        "drop_locked": False if args.keep_locked else _resolve("drop_locked", None),
+        "drop_over_18": True if args.drop_over_18 else _resolve("drop_over_18", None),
     }
 
     inp = Path(args.input)

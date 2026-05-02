@@ -27,7 +27,7 @@ ENV_LOCATIONS = [
 ]
 
 
-def load_env_file():
+def load_env_file() -> Path | None:
     """从 .env 文件加载环境变量。
 
     支持格式：
@@ -53,7 +53,7 @@ def load_env_file():
     return None
 
 
-def check_packages():
+def check_packages() -> bool:
     missing = []
     for pkg in REQUIRED_PACKAGES:
         try:
@@ -68,7 +68,7 @@ def check_packages():
     return True
 
 
-def check_env():
+def check_env() -> bool:
     missing = [v for v in REQUIRED_ENV if not os.environ.get(v)]
     if missing:
         print(f"[FAIL] 缺少环境变量: {', '.join(missing)}")
@@ -78,7 +78,7 @@ def check_env():
     return True
 
 
-def check_connectivity():
+def check_connectivity() -> bool:
     try:
         import praw
     except ImportError:
@@ -98,7 +98,7 @@ def check_connectivity():
         return False
 
 
-def main():
+def main() -> None:
     env_path = load_env_file()
     if env_path:
         print(f"[INFO] 从 {env_path} 加载凭证")
