@@ -1,0 +1,16 @@
+{
+  "name": "reddit-research",
+  "description": "通过挖掘 Reddit 真实讨论，快速获取产品、话题、趋势的用户洞察",
+  "version": "1.0.0",
+  "author": {
+    "name": "yangjunjie0320"
+  },
+  "repository": "https://github.com/yangjunjie0320/reddit-research",
+  "keywords": [
+    "reddit",
+    "research",
+    "sentiment",
+    "product-research",
+    "market-research"
+  ]
+}
