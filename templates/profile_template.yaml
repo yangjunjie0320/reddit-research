@@ -24,18 +24,22 @@ categorization:
 research_intent: |
   Inferred goal of the research, in plain language.
 
-# 4 to 8 subreddits. 1 to 2 broad, 2 to 4 narrow topical.
+# 4 to 8 subreddits for analysis context and report reference.
+# NOT used for search scoping -- search always uses site:reddit.com.
 recommended_subreddits:
   - SubredditName1
   - SubredditName2
   - SubredditName3
   - SubredditName4
 
-# 6 to 10 search queries. Mix angles in proportion to categorization weights.
+# Search keywords. Include original language, translations, and
+# related terms. Total count must not exceed fetch.max_keywords.
+# Each keyword is searched independently with site:reddit.com.
 keyword_groups:
   - "<keyword> review"
   - "<keyword> problem"
   - "best <keyword>"
+  - "<keyword_translated> review"   # bilingual counterpart
   - "<keyword> vs alternative"
   - "<keyword> after one year"
   - "is <keyword> worth it"
@@ -64,9 +68,14 @@ report_modules:
 
 # Fetch parameters. Defaults work for most keywords.
 fetch:
+  max_keywords: 15          # cap on keyword_groups entries
   posts_per_keyword: 25
   comments_per_post: 15
-  time_filter: year   # all, year, month, week
+  time_filter: year         # all, year, month, week
+
+# Discovery parameters. Controls total search output volume.
+discovery:
+  max_results: 200          # global cap on discovered URLs after dedup
 
 # Filter overrides. Leave empty to use defaults from filter_posts.py.
 filter_overrides: {}

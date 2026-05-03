@@ -1,0 +1,46 @@
+# Test profile: Chinese keyword test
+# Demonstrates bilingual keyword strategy with Chinese input
+
+keyword: "机械键盘"
+slug: "mechanical-keyboard-cn"
+
+categorization:
+  product: 0.7
+  lifestyle: 0.2
+  tech_phenomenon: 0.1
+
+research_intent: |
+  Quick test of Chinese keyword search with bilingual expansion.
+
+recommended_subreddits:
+  - MechanicalKeyboards
+  - keyboards
+  - China_irl
+
+keyword_groups:
+  - "mechanical keyboard review"
+  - "best mechanical keyboard"
+  - "机械键盘 推荐"
+  - "机械键盘 问题"
+  - "cherry mx review"
+
+analysis_emphasis:
+  - key_claims
+  - specific_evidence
+  - entities_mentioned
+
+report_modules:
+  - M01_one_line
+  - M02_pain_point_chart
+  - M14_data_appendix
+
+fetch:
+  max_keywords: 15
+  posts_per_keyword: 5
+  comments_per_post: 10
+  time_filter: year
+
+discovery:
+  max_results: 50
+
+filter_overrides: {}

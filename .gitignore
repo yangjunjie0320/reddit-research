@@ -13,6 +13,7 @@ __pycache__/
 # Run outputs
 runs/
 research/
+evals/
 
 # Editor files
 *.swp
@@ -20,6 +21,7 @@ research/
 *~
 .idea/
 .vscode/
+.ruff_cache/
 
 # OS files
 .DS_Store

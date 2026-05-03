@@ -39,14 +39,15 @@ uv run python scripts/save_credentials.py
 - `slug`：kebab-case 标识符
 - `categorization`：多标签分类（权重之和 1.0）
 - `research_intent`：一句话研究意图，需与用户确认
-- `recommended_subreddits`：4-8 个子版块（参考 `docs/REFERENCE.md`）
-- `keyword_groups`：6-10 个搜索查询词组
+- `recommended_subreddits`：4-8 个子版块（分析上下文，不用于搜索限定）
+- `keyword_groups`：搜索关键词（包含原文、译文和补充词，不超过 `fetch.max_keywords`）
 - `analysis_emphasis`：统一 schema 中重点关注的字段
 - `report_modules`：报告模块 ID 列表（参考 `docs/REPORT_MODULES.md`）
-- `fetch`：抓取参数
+- `fetch`：抓取参数（`max_keywords`、`posts_per_keyword`、`comments_per_post`、`time_filter`）
+- `discovery`：搜索发现参数（`max_results`，默认 200）
 - `filter_overrides`：过滤阈值覆盖
 
-画像生成的详细规则（中英双轨、查询角度模板、分类词汇表）见 `docs/PROFILE.md`。
+画像生成的详细规则（双语策略、分类词汇表）见 `docs/PROFILE.md`。
 
 生成后向用户展示并确认，循环直到用户满意。
 

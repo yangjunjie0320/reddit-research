@@ -15,6 +15,7 @@ Usage:
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -125,6 +126,12 @@ def main() -> None:
         sys.exit(1)
     if not discovered_path.exists():
         log.error("%s not found. Run search_client.py --run first.", discovered_path)
+        sys.exit(1)
+    if not os.access(run_dir, os.W_OK):
+        log.error(
+            "Run directory is not writable: %s. Check permissions.",
+            run_dir,
+        )
         sys.exit(1)
 
     with open(profile_path, encoding="utf-8") as f:

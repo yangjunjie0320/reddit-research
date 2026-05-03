@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -57,6 +58,21 @@ def _request(method: str, url: str, **kwargs: object) -> requests.Response:
     raise RuntimeError("Search API failed after 3 rate-limit retries")
 
 
+# Serper rate limiter -- 1 QPS hard limit, shared across all instances.
+_serper_lock = threading.Lock()
+_serper_last_request_at: float = 0.0
+_SERPER_MIN_INTERVAL = 1.0
+
+
+def _serper_throttle() -> None:
+    global _serper_last_request_at
+    with _serper_lock:
+        elapsed = time.monotonic() - _serper_last_request_at
+        if elapsed < _SERPER_MIN_INTERVAL:
+            time.sleep(_SERPER_MIN_INTERVAL - elapsed)
+        _serper_last_request_at = time.monotonic()
+
+
 class SerperClient:
     """Google Search via Serper API."""
 
@@ -82,6 +98,7 @@ class SerperClient:
             }
             if tbs:
                 payload["tbs"] = tbs
+            _serper_throttle()
             resp = _request(
                 "POST",
                 self.URL,
@@ -105,6 +122,21 @@ class SerperClient:
             results.extend(batch)
             page += 1
         return results[:num_results]
+
+
+# Brave API rate limiter -- 1 QPS hard limit, shared across all instances.
+_brave_lock = threading.Lock()
+_brave_last_request_at: float = 0.0
+_BRAVE_MIN_INTERVAL = 1.0
+
+
+def _brave_throttle() -> None:
+    global _brave_last_request_at
+    with _brave_lock:
+        elapsed = time.monotonic() - _brave_last_request_at
+        if elapsed < _BRAVE_MIN_INTERVAL:
+            time.sleep(_BRAVE_MIN_INTERVAL - elapsed)
+        _brave_last_request_at = time.monotonic()
 
 
 class BraveClient:
@@ -132,6 +164,7 @@ class BraveClient:
             }
             if freshness:
                 params["freshness"] = freshness
+            _brave_throttle()
             resp = _request(
                 "GET",
                 self.URL,
@@ -180,13 +213,11 @@ class SearchClient:
     def search(
         self,
         query: str,
-        subreddit: str | None = None,
         num_results: int = 10,
         time_filter: str = "all",
     ) -> list[dict]:
         """Return Reddit post result dicts with url, title, snippet, rank, source."""
-        site = f"site:reddit.com/r/{subreddit}" if subreddit else "site:reddit.com"
-        q = f"{site} {query}"
+        q = f"site:reddit.com {query}"
 
         all_results: list[dict] = []
 
@@ -230,6 +261,25 @@ def build_search_client() -> SearchClient:
     )
 
 
+def _validate_profile(profile: dict, log: logging.Logger) -> None:
+    """Validate required profile fields, exit with friendly message on error."""
+    required = ["keyword_groups"]
+    missing = [k for k in required if k not in profile]
+    if missing:
+        log.error(
+            "profile.yaml is missing required fields: %s. "
+            "See templates/profile_template.yaml for the expected schema.",
+            ", ".join(missing),
+        )
+        sys.exit(1)
+    if not isinstance(profile["keyword_groups"], list) or not profile["keyword_groups"]:
+        log.error(
+            "profile.yaml keyword_groups must be a non-empty list. "
+            "See templates/profile_template.yaml for the expected schema."
+        )
+        sys.exit(1)
+
+
 def main() -> None:
     from save_credentials import load_env
 
@@ -252,73 +302,133 @@ def main() -> None:
         log.error("Profile not found: %s", profile_path)
         sys.exit(1)
 
+    # Check output directory is writable.
+    out_dir = run_dir or Path(".")
+    if not os.access(out_dir, os.W_OK):
+        log.error(
+            "Output directory is not writable: %s. "
+            "Check permissions or choose a different --run path.",
+            out_dir,
+        )
+        sys.exit(1)
+
     with open(profile_path, encoding="utf-8") as f:
         profile = yaml.safe_load(f)
 
-    subreddits: list[str] = profile["recommended_subreddits"]
+    _validate_profile(profile, log)
+
     queries: list[str] = profile["keyword_groups"]
     fetch_cfg: dict = profile.get("fetch", {})
+    max_keywords: int = fetch_cfg.get("max_keywords", 15)
+    if len(queries) > max_keywords:
+        log.warning(
+            "keyword_groups has %d entries, truncating to max_keywords=%d",
+            len(queries),
+            max_keywords,
+        )
+        queries = queries[:max_keywords]
     limit = args.limit or fetch_cfg.get("posts_per_keyword", 25)
     time_filter: str = fetch_cfg.get("time_filter", "year")
+    discovery_cfg: dict = profile.get("discovery", {})
+    max_results: int = discovery_cfg.get("max_results", 200)
+
+    log.info(
+        "Starting search: %d keywords, limit=%d per keyword, "
+        "time_filter=%s, max_results=%d",
+        len(queries),
+        limit,
+        time_filter,
+        max_results,
+    )
 
     client = build_search_client()
     all_discovered: list[dict] = []
     seen_ids: set[str] = set()
 
-    request_count = 0
-    for sub in subreddits:
-        for query in queries:
-            # Delay between requests to respect API rate limits
-            if request_count > 0:
-                time.sleep(1.5)
-            request_count += 1
-            log.info("  [%d] searching r/%s: %r", request_count, sub, query)
-            try:
-                results = client.search(
-                    query,
-                    subreddit=sub,
-                    num_results=limit,
-                    time_filter=time_filter,
-                )
-            except Exception as e:
-                log.warning("    search error (skipping): %s", e)
-                continue
+    # Per-source statistics for discovery summary.
+    stats: dict[str, dict[str, int]] = {}
+    total_raw = 0
+    total_valid_before_dedupe = 0
 
-            added = 0
-            for r in results:
-                pid = extract_post_id(r["url"])
-                if not pid or pid in seen_ids:
-                    continue
-                seen_ids.add(pid)
-                all_discovered.append(
-                    {
-                        "url": r["url"],
-                        "post_id": pid,
-                        "subreddit": extract_subreddit(r["url"]) or sub,
-                        "title": r["title"],
-                        "snippet": r["snippet"],
-                        "source": r.get("source", "unknown"),
-                        "query": query,
-                        "rank": r["rank"],
-                    }
-                )
-                added += 1
-            log.info("    +%d new URLs", added)
+    request_count = 0
+    for query in queries:
+        # Delay between requests to respect API rate limits
+        if request_count > 0:
+            time.sleep(1.5)
+        request_count += 1
+        log.info("  [%d] searching: %r", request_count, query)
+        try:
+            results = client.search(
+                query,
+                num_results=limit,
+                time_filter=time_filter,
+            )
+        except Exception as e:
+            log.warning("    search error (skipping): %s", e)
+            continue
+
+        added = 0
+        for r in results:
+            source = r.get("source", "unknown")
+            if source not in stats:
+                stats[source] = {"raw": 0, "valid": 0}
+            stats[source]["raw"] += 1
+            total_raw += 1
+
+            pid = extract_post_id(r["url"])
+            if not pid:
+                continue
+            stats[source]["valid"] += 1
+            total_valid_before_dedupe += 1
+
+            if pid in seen_ids:
+                continue
+            seen_ids.add(pid)
+            all_discovered.append(
+                {
+                    "url": r["url"],
+                    "post_id": pid,
+                    "subreddit": extract_subreddit(r["url"]) or "",
+                    "title": r["title"],
+                    "snippet": r["snippet"],
+                    "source": source,
+                    "query": query,
+                    "rank": r["rank"],
+                }
+            )
+            added += 1
+        log.info("    +%d new URLs", added)
 
     if not all_discovered:
-        log.error("No valid Reddit post URLs discovered.")
+        log.error(
+            "No valid Reddit post URLs discovered. "
+            "Try broadening keyword_groups or adjusting time_filter in profile.yaml."
+        )
         sys.exit(1)
 
-    log.info("\nTotal: %d unique posts discovered.", len(all_discovered))
+    # Sort by rank (lower = more relevant) and apply max_results cap.
+    all_discovered.sort(key=lambda r: r["rank"])
+    retained = all_discovered[:max_results]
+
+    # --- Discovery summary ---
+    log.info("")
+    log.info("Search discovery summary:")
+    for src, counts in sorted(stats.items()):
+        log.info("  %s raw URLs: %d", src.capitalize(), counts["raw"])
+        log.info("  %s valid Reddit post URLs: %d", src.capitalize(), counts["valid"])
+    log.info("  Total raw URLs: %d", total_raw)
+    log.info("  Total valid Reddit post URLs before dedupe: %d", total_valid_before_dedupe)
+    log.info("  Unique valid Reddit post URLs after dedupe: %d", len(all_discovered))
+    log.info("  Final retained URLs: %d / %d", len(retained), max_results)
 
     if run_dir:
         out_path = run_dir / "discovered_posts.jsonl"
         with open(out_path, "w", encoding="utf-8") as f:
-            for rec in all_discovered:
+            for rec in retained:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
         log.info("Written to %s", out_path)
     else:
-        for rec in all_discovered:
+        for rec in retained:
             print(json.dumps(rec, ensure_ascii=False))
 
 

@@ -23,51 +23,28 @@
 
 允许多标签，如 `{product: 0.5, controversy: 0.3, lifestyle: 0.2}`。
 
-## 关键词语言识别
+## 关键词双语策略
 
-- **含中文字符** → 启用中英双轨
-- **其他所有情况** → 英文单轨（含日、韩、西等小语种）
+所有关键词均启用双语搜索：
 
-## 中英双轨策略（仅中文关键词）
+1. 英文关键词翻译为中文，中文关键词翻译为英文
+2. 补充 Agent 认为相关的关键词（同义词、近义词、常见变体）
+3. 关键词总数不超过 `fetch.max_keywords`（默认 15）
+4. 翻译时避免直译，贴近 Reddit 社区用语
+5. 关键词直接作为搜索查询词，不再拼接子版块限定
+
+中文关键词时，关键词列表应同时包含中文查询词和英文翻译查询词。
+英文关键词时，关键词列表应同时包含英文查询词和中文翻译查询词。
 
 Reddit 中文圈以海外华人为主（r/China_irl、r/saraba1st 等）。
-
-1. 生成 5-7 条中文查询词组
-2. 同时生成 5-7 条英文翻译查询词组（贴近 Reddit 用语）
-3. 子版块列表必须包含至少一个中文区域子版块和若干英文主流子版块
-4. 翻译时避免直译，如「四天工作制」→ `four day workweek`
-
-中文区域子版块：r/China_irl、r/saraba1st、r/real_China_irl、r/Chinatown_irl
-
-## 查询角度模板
-
-### 英语
-
-| 角度 | 查询模板 |
-|------|----------|
-| 问题导向 | `<keyword> problem`, `<keyword> issue`, `<keyword> hate` |
-| 比较导向 | `best <keyword>`, `<keyword> vs`, `alternative to <keyword>` |
-| 体验导向 | `<keyword> review`, `tried <keyword>`, `<keyword> after one year` |
-| 立场导向 | `<keyword> change my mind`, `unpopular opinion <keyword>`, `<keyword> overrated` |
-| 发现导向 | `<keyword> recommendation`, `is <keyword> worth it` |
-
-### 中文
-
-| 角度 | 查询模板 |
-|------|----------|
-| 问题导向 | `<keyword> 问题`, `<keyword> 缺点`, `<keyword> 坑`, `<keyword> 吐槽` |
-| 比较导向 | `<keyword> 推荐`, `<keyword> 对比`, `<keyword> 替代品` |
-| 体验导向 | `<keyword> 测评`, `<keyword> 使用感受`, `<keyword> 真实体验` |
-| 立场导向 | `<keyword> 争议`, `<keyword> 被高估`, `<keyword> 值不值` |
-| 发现导向 | `<keyword> 值得买吗`, `<keyword> 怎么选` |
-
-中文关键词**两套都生成**。
 
 ## 子版块推荐
 
 以 `docs/REFERENCE.md` 为起点。始终包含：
 - 1-2 个广泛子版块（如 r/AskReddit、r/changemyview）
 - 2-4 个垂直主题子版块
+
+注意：`recommended_subreddits` 仅用于分析上下文和报告参考，不用于搜索限定。搜索始终使用 `site:reddit.com`。
 
 ## 分析重点 (analysis_emphasis)
 
