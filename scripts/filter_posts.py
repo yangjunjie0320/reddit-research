@@ -2,66 +2,52 @@
 """
 filter_posts.py
 
-Apply rule based filters to raw_posts.jsonl. The defaults remove low
-engagement, very short, very old, or moderation flagged posts. All
-thresholds can be overridden via --profile (reads filter_overrides from
-profile.yaml) or via explicit CLI flags (highest priority).
+Apply rule-based filters to hydrated_posts.jsonl. Defaults remove low
+engagement, very short, very old, or moderation-flagged posts. Thresholds
+can be overridden via profile.yaml filter_overrides or CLI flags.
 
 Usage:
-    python filter_posts.py --input research/<slug>/raw_posts.jsonl \\
-                           --output research/<slug>/candidates.jsonl
-
-    # Let profile.yaml drive overrides:
-    python filter_posts.py --profile research/<slug>/profile.yaml \\
-                           --input research/<slug>/raw_posts.jsonl \\
-                           --output research/<slug>/candidates.jsonl
+    uv run python scripts/filter_posts.py --run runs/{run_id}
+    uv run python scripts/filter_posts.py --run runs/{run_id} --min-score 10 --verbose
 """
 
 import argparse
 import json
+import logging
 import sys
 import time
 from pathlib import Path
 
 import yaml
 
+from log_utils import get_logger, update_run_meta
+
+_log = logging.getLogger(__name__)
 
 DEFAULTS = {
     "min_score": 5,
     "min_comments": 3,
     "min_selftext_chars": 100,
-    "min_top_comment_chars": 200,  # alternative path: short OP, rich comments
+    "min_top_comment_chars": 200,
     "max_age_months": 24,
     "drop_stickied": True,
     "drop_locked": True,
     "drop_over_18": False,
 }
 
-# Keys in filter_overrides that map directly to cfg keys.
-_OVERRIDE_KEY_MAP = {
-    "min_score": "min_score",
-    "min_comments": "min_comments",
-    "min_selftext_chars": "min_selftext_chars",
-    "min_top_comment_chars": "min_top_comment_chars",
-    "max_age_months": "max_age_months",
-    "drop_stickied": "drop_stickied",
-    "drop_locked": "drop_locked",
-    "drop_over_18": "drop_over_18",
-}
+_OVERRIDE_KEYS = set(DEFAULTS.keys())
 
 
-def load_profile_overrides(profile_path: str) -> dict:
-    """Read filter_overrides from a profile YAML. Returns empty dict on error."""
+def _load_profile_overrides(profile_path: Path) -> dict:
     try:
-        with open(profile_path, "r", encoding="utf-8") as f:
+        with open(profile_path, encoding="utf-8") as f:
             profile = yaml.safe_load(f) or {}
         overrides = profile.get("filter_overrides") or {}
         if not isinstance(overrides, dict):
             return {}
-        # Only keep recognised keys.
-        return {k: v for k, v in overrides.items() if k in _OVERRIDE_KEY_MAP}
+        return {k: v for k, v in overrides.items() if k in _OVERRIDE_KEYS}
     except Exception as e:
-        print(f"Warning: could not read filter_overrides from {profile_path}: {e}")
+        _log.warning("could not read filter_overrides: %s", e)
         return {}
 
 
@@ -91,24 +77,20 @@ def post_passes(post: dict, cfg: dict, now_utc: float) -> tuple[bool, str]:
     if not selftext_ok and not comments_ok:
         return False, "thin content"
 
-    # Removed posts often have selftext starting with "[removed" or "[deleted".
     selftext_lower = post.get("selftext", "").strip().lower()
-    if selftext_lower.startswith("[removed") or selftext_lower.startswith("[deleted"):
-        if not comments_ok:
-            return False, "removed body, thin comments"
+    if (
+        selftext_lower.startswith("[removed") or selftext_lower.startswith("[deleted")
+    ) and not comments_ok:
+        return False, "removed body, thin comments"
 
     return True, "kept"
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input", required=True)
-    parser.add_argument("--output", required=True)
-    parser.add_argument(
-        "--profile",
-        default=None,
-        help="Path to profile.yaml; filter_overrides section is read as defaults",
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Filter hydrated posts by engagement, age, and content."
     )
+    parser.add_argument("--run", required=True, help="Run directory path")
     parser.add_argument("--min-score", type=int, default=None)
     parser.add_argument("--min-comments", type=int, default=None)
     parser.add_argument("--min-selftext-chars", type=int, default=None)
@@ -120,15 +102,25 @@ def main():
     parser.add_argument("--verbose", action="store_true", help="Print drop reasons")
     args = parser.parse_args()
 
+    run_dir = Path(args.run)
+    inp = run_dir / "hydrated_posts.jsonl"
+    out = run_dir / "filtered_posts.jsonl"
+    profile_path = run_dir / "profile.yaml"
+
+    log = get_logger(__name__, run_dir)
+
+    if not inp.exists():
+        log.error("%s not found. Run fetch_reddit.py first.", inp)
+        sys.exit(1)
+
     # Priority: CLI flag > profile filter_overrides > DEFAULTS.
     profile_overrides = {}
-    if args.profile:
-        profile_overrides = load_profile_overrides(args.profile)
+    if profile_path.exists():
+        profile_overrides = _load_profile_overrides(profile_path)
         if profile_overrides:
-            print(f"Loaded filter_overrides from profile: {profile_overrides}")
+            log.info("Loaded filter_overrides from profile: %s", profile_overrides)
 
-    def _resolve(key: str, cli_val):
-        """Return CLI value if explicitly set, else profile override, else default."""
+    def _resolve(key: str, cli_val: object) -> object:
         if cli_val is not None:
             return cli_val
         return profile_overrides.get(key, DEFAULTS[key])
@@ -137,23 +129,26 @@ def main():
         "min_score": _resolve("min_score", args.min_score),
         "min_comments": _resolve("min_comments", args.min_comments),
         "min_selftext_chars": _resolve("min_selftext_chars", args.min_selftext_chars),
-        "min_top_comment_chars": _resolve("min_top_comment_chars", args.min_top_comment_chars),
+        "min_top_comment_chars": _resolve(
+            "min_top_comment_chars", args.min_top_comment_chars
+        ),
         "max_age_months": _resolve("max_age_months", args.max_age_months),
-        "drop_stickied": False if args.keep_stickied else _resolve("drop_stickied", None),
-        "drop_locked": False if args.keep_locked else _resolve("drop_locked", None),
-        "drop_over_18": True if args.drop_over_18 else _resolve("drop_over_18", None),
+        "drop_stickied": (
+            False if args.keep_stickied else _resolve("drop_stickied", None)
+        ),
+        "drop_locked": (False if args.keep_locked else _resolve("drop_locked", None)),
+        "drop_over_18": (True if args.drop_over_18 else _resolve("drop_over_18", None)),
     }
-
-    inp = Path(args.input)
-    out = Path(args.output)
-    out.parent.mkdir(parents=True, exist_ok=True)
 
     now_utc = time.time()
     kept = 0
     dropped = 0
-    drop_reasons = {}
+    drop_reasons: dict[str, int] = {}
 
-    with open(inp, "r", encoding="utf-8") as fin, open(out, "w", encoding="utf-8") as fout:
+    with (
+        open(inp, encoding="utf-8") as fin,
+        open(out, "w", encoding="utf-8") as fout,
+    ):
         for line in fin:
             line = line.strip()
             if not line:
@@ -170,13 +165,15 @@ def main():
                 dropped += 1
                 drop_reasons[reason] = drop_reasons.get(reason, 0) + 1
                 if args.verbose:
-                    print(f"  dropped {post.get('id')}: {reason}")
+                    log.info("  dropped %s: %s", post.get("id"), reason)
 
-    print(f"Kept {kept}, dropped {dropped}")
+    log.info("Kept %d, dropped %d", kept, dropped)
     if drop_reasons:
-        print("Drop reasons:")
+        log.info("Drop reasons:")
         for r, n in sorted(drop_reasons.items(), key=lambda x: -x[1]):
-            print(f"  {n:4d}  {r}")
+            log.info("  %4d  %s", n, r)
+
+    update_run_meta(run_dir, {"filtered_count": kept})
 
 
 if __name__ == "__main__":

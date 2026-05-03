@@ -7,7 +7,11 @@ __pycache__/
 *$py.class
 *.so
 
-# Research outputs
+# Credentials
+.secrets/
+
+# Run outputs
+runs/
 research/
 
 # Editor files
