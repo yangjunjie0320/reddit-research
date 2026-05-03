@@ -183,13 +183,13 @@ class BraveClient:
                             "url": url,
                             "title": item.get("title", ""),
                             "snippet": item.get("description", ""),
-                            "rank": offset + idx + 1,
+                            "rank": len(results) + idx + 1,
                         }
                     )
             if not batch:
                 break
             results.extend(batch)
-            offset += 20
+            offset += 1
         return results[:num_results]
 
 

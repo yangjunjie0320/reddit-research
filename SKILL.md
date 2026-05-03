@@ -39,8 +39,7 @@ uv run python scripts/save_credentials.py
 - `slug`：kebab-case 标识符
 - `categorization`：多标签分类（权重之和 1.0）
 - `research_intent`：一句话研究意图，需与用户确认
-- `recommended_subreddits`：4-8 个子版块（分析上下文，不用于搜索限定）
-- `keyword_groups`：搜索关键词（包含原文、译文和补充词，不超过 `fetch.max_keywords`）
+- `keyword_groups`：搜索关键词（包含原文、译文和补充词，强制在遇到容易产生歧义的词时自动追加否定词（如 `-dealership`），不超过 `fetch.max_keywords`）
 - `analysis_emphasis`：统一 schema 中重点关注的字段
 - `report_modules`：报告模块 ID 列表（参考 `docs/REPORT_MODULES.md`）
 - `fetch`：抓取参数（`max_keywords`、`posts_per_keyword`、`comments_per_post`、`time_filter`）
@@ -93,15 +92,17 @@ uv run python scripts/build_analysis_pack.py --run runs/{run_id}
 
 ## 第七阶段：模块化报告
 
-从 `docs/REPORT_MODULES.md` 的模块库中，按 profile.report_modules 列表组装报告。M01 在最前，M14 在最后。
+从 `docs/REPORT_MODULES.md` 的模块库中，按 profile.report_modules 列表组装报告。始终以 M01 开头，并以 M14、M15、M16 结尾。
 
 产出：`runs/{run_id}/report.md`。向用户内联展示。
 
 ## 输出规范
 
 - 报告语言跟随关键词语言
-- Reddit 引用不超过 15 词，保留原文超链接
+- 论述观点时必须列出相关原帖的超链接作为依据
+- Reddit 引用不超过 15 词，加入原文的超链接
 - 剥离所有 Reddit 用户名
+- 报告末尾必须包含：M15 值得阅读的帖子（Featured Posts）和 M16 活跃的子版块（Active Subreddits）
 - 数字合理四舍五入
 
 ## 常见失败模式

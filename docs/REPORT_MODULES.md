@@ -1,6 +1,6 @@
 # 报告模块库
 
-每个模块是最终报告的一个独立章节。根据关键词画像选 5-8 个模块。始终以 M01 开头、M14 结尾。
+每个模块是最终报告的一个独立章节。根据关键词画像选 5-8 个模块。始终以 M01 开头，并以 M14、M15、M16 结尾。
 
 ---
 
@@ -116,20 +116,32 @@
 
 ---
 
+## M15_featured_posts
+
+值得阅读的帖子。总结并推荐 1-3 篇最具价值或最精彩的原帖链接及理由。所有报告必选。
+
+---
+
+## M16_active_subreddits
+
+活跃的子版块。根据抓取到的数据（如 `analysis.jsonl` 中的来源分布），列出在本次调研中发现的最真实、活跃的 subreddit。所有报告必选。
+
+---
+
 ## 按分类快速选择
 
 | 分类 | 推荐模块 |
 |------|----------|
-| product | M01, M02, M03, M04, M05, M13, M14 |
-| service | M01, M02, M03, M04, M13, M14 |
-| policy | M01, M06, M07, M11, M12, M14 |
-| controversy | M01, M06, M07, M08, M11, M12, M14 |
-| social_event | M01, M06, M08, M10, M11, M14 |
-| public_figure | M01, M04, M08, M11, M12, M14 |
-| cultural_trend | M01, M08, M09, M10, M14 |
-| tech_phenomenon | M01, M04, M09, M10, M13, M14 |
-| health_topic | M01, M02, M09, M11, M12, M14 |
-| lifestyle | M01, M08, M09, M10, M14 |
-| media_work | M01, M08, M11, M14 |
+| product | M01, M02, M03, M04, M05, M13, M14, M15, M16 |
+| service | M01, M02, M03, M04, M13, M14, M15, M16 |
+| policy | M01, M06, M07, M11, M12, M14, M15, M16 |
+| controversy | M01, M06, M07, M08, M11, M12, M14, M15, M16 |
+| social_event | M01, M06, M08, M10, M11, M14, M15, M16 |
+| public_figure | M01, M04, M08, M11, M12, M14, M15, M16 |
+| cultural_trend | M01, M08, M09, M10, M14, M15, M16 |
+| tech_phenomenon | M01, M04, M09, M10, M13, M14, M15, M16 |
+| health_topic | M01, M02, M09, M11, M12, M14, M15, M16 |
+| lifestyle | M01, M08, M09, M10, M14, M15, M16 |
+| media_work | M01, M08, M11, M14, M15, M16 |
 
 混合分类时取前两个标签模块的并集，去重后裁剪到 5-8 个。

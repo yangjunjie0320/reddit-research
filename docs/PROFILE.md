@@ -29,22 +29,16 @@
 
 1. 英文关键词翻译为中文，中文关键词翻译为英文
 2. 补充 Agent 认为相关的关键词（同义词、近义词、常见变体）
-3. 关键词总数不超过 `fetch.max_keywords`（默认 15）
-4. 翻译时避免直译，贴近 Reddit 社区用语
-5. 关键词直接作为搜索查询词，不再拼接子版块限定
+3. 强制系统在遇到容易产生歧义的词时，自动追加否定词（Negative Keywords）（例如搜索词改为 `"diecast" OR "scale model" -dealership -mpg -insurance`），以过滤无关信息污染
+4. 关键词总数不超过 `fetch.max_keywords`（默认 15）
+5. 翻译时避免直译，贴近 Reddit 社区用语
+6. 关键词直接作为搜索查询词，不再拼接子版块限定
 
 中文关键词时，关键词列表应同时包含中文查询词和英文翻译查询词。
 英文关键词时，关键词列表应同时包含英文查询词和中文翻译查询词。
 
 Reddit 中文圈以海外华人为主（r/China_irl、r/saraba1st 等）。
 
-## 子版块推荐
-
-以 `docs/REFERENCE.md` 为起点。始终包含：
-- 1-2 个广泛子版块（如 r/AskReddit、r/changemyview）
-- 2-4 个垂直主题子版块
-
-注意：`recommended_subreddits` 仅用于分析上下文和报告参考，不用于搜索限定。搜索始终使用 `site:reddit.com`。
 
 ## 分析重点 (analysis_emphasis)
 
